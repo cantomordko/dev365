@@ -43,6 +43,12 @@ def draw_grid(screen, grid):
             pygame.draw.rect(screen, color, rect)
     pygame.display.flip()
 
+# Add this function to render the score
+def draw_score(screen, score):
+    font = pygame.font.Font(None, 36)  # Use a default font with size 36
+    text = font.render(f'Score: {score}', True, (255, 255, 255))  # White text
+    screen.blit(text, (10, 10))  # Draw the text at the top-left corner
+
 # Swap two candies
 def swap(grid, pos1, pos2):
     y1, x1 = pos1
@@ -147,6 +153,7 @@ def main():
                                 swap(grid, selected, pos)  # swap back
                         selected = None
         draw_grid(screen, grid)
+        draw_score(screen, score)  # Draw the score on the screen
         pygame.display.set_caption(f'Candy Crush - Score: {score}')
         clock.tick(FPS)
 
