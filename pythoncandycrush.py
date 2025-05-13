@@ -20,6 +20,12 @@ CANDY_COLORS = [
 ]
 NUM_CANDIES = len(CANDY_COLORS)
 
+# Add special candy types
+SPECIAL_CANDY = {
+    'striped': 'striped',  # Clears a row or column
+    'bomb': 'bomb'         # Clears a 3x3 area
+}
+
 # Initialize Pygame
 def init_pygame():
     pygame.init()
@@ -27,9 +33,9 @@ def init_pygame():
     pygame.display.set_caption('Candy Crush')
     return screen, pygame.time.Clock()
 
-# Create initial grid
+# Modify the grid to include special candies
 def create_grid():
-    return [[random.randrange(NUM_CANDIES) for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+    return [[{'type': 'normal', 'color': random.randrange(NUM_CANDIES)} for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
 
 # Draw grid and candies
 def draw_grid(screen, grid):
@@ -37,10 +43,14 @@ def draw_grid(screen, grid):
     for y in range(GRID_SIZE):
         for x in range(GRID_SIZE):
             candy = grid[y][x]
-            color = CANDY_COLORS[candy]
+            color = CANDY_COLORS[candy['color']]
             rect = pygame.Rect(x*CELL_SIZE+PADDING, y*CELL_SIZE+PADDING,
                                CELL_SIZE-2*PADDING, CELL_SIZE-2*PADDING)
             pygame.draw.rect(screen, color, rect)
+            if candy['type'] == SPECIAL_CANDY['striped']:
+                pygame.draw.line(screen, (255, 255, 255), rect.topleft, rect.bottomright, 3)
+            elif candy['type'] == SPECIAL_CANDY['bomb']:
+                pygame.draw.circle(screen, (255, 255, 255), rect.center, CELL_SIZE//4)
     pygame.display.flip()
 
 # Add this function to render the score
@@ -54,6 +64,28 @@ def swap(grid, pos1, pos2):
     y1, x1 = pos1
     y2, x2 = pos2
     grid[y1][x1], grid[y2][x2] = grid[y2][x2], grid[y1][x1]
+
+# Animate candy swap
+def animate_swap(screen, grid, pos1, pos2):
+    y1, x1 = pos1
+    y2, x2 = pos2
+    rect1 = pygame.Rect(x1 * CELL_SIZE + PADDING, y1 * CELL_SIZE + PADDING,
+                        CELL_SIZE - 2 * PADDING, CELL_SIZE - 2 * PADDING)
+    rect2 = pygame.Rect(x2 * CELL_SIZE + PADDING, y2 * CELL_SIZE + PADDING,
+                        CELL_SIZE - 2 * PADDING, CELL_SIZE - 2 * PADDING)
+    steps = 10  # Number of animation steps
+    for step in range(steps + 1):
+        screen.fill((50, 50, 50))  # Clear screen
+        draw_grid(screen, grid)  # Draw the grid
+        # Interpolate positions
+        offset_x = (x2 - x1) * CELL_SIZE * step / steps
+        offset_y = (y2 - y1) * CELL_SIZE * step / steps
+        pygame.draw.rect(screen, CANDY_COLORS[grid[y1][x1]['color']],
+                         rect1.move(offset_x, offset_y))
+        pygame.draw.rect(screen, CANDY_COLORS[grid[y2][x2]['color']],
+                         rect2.move(-offset_x, -offset_y))
+        pygame.display.flip()
+        pygame.time.delay(30)
 
 # Find matches (>=3 in row or col)
 def find_matches(grid):
@@ -96,14 +128,24 @@ def remove_matches(grid, matches):
     for x in range(GRID_SIZE):
         col = [grid[y][x] for y in range(GRID_SIZE) if grid[y][x] is not None]
         missing = GRID_SIZE - len(col)
-        new_col = [None]*missing + col
+        new_col = [None] * missing + col
         for y in range(GRID_SIZE):
             grid[y][x] = new_col[y]
     # Refill
     for y in range(GRID_SIZE):
         for x in range(GRID_SIZE):
             if grid[y][x] is None:
-                grid[y][x] = random.randrange(NUM_CANDIES)
+                grid[y][x] = {'type': 'normal', 'color': random.randrange(NUM_CANDIES)}
+
+# Animate collapsing candies
+def animate_collapse(screen, grid, matches):
+    for _ in range(10):  # Example animation loop
+        for y, x in matches:
+            rect = pygame.Rect(x * CELL_SIZE + PADDING, y * CELL_SIZE + PADDING,
+                               CELL_SIZE - 2 * PADDING, CELL_SIZE - 2 * PADDING)
+            pygame.draw.rect(screen, (0, 0, 0), rect)  # Fade out effect
+        pygame.display.flip()
+        pygame.time.delay(50)
 
 # Check adjacency
 def is_adjacent(pos1, pos2):
@@ -142,15 +184,18 @@ def main():
                         selected = pos
                     else:
                         if is_adjacent(selected, pos):
+                            animate_swap(screen, grid, selected, pos)  # Animate swap
                             swap(grid, selected, pos)
                             matches = find_matches(grid)
                             if matches:
                                 while matches:
                                     score += len(matches)
+                                    animate_collapse(screen, grid, matches)  # Animate collapse
                                     remove_matches(grid, matches)
                                     matches = find_matches(grid)
                             else:
-                                swap(grid, selected, pos)  # swap back
+                                animate_swap(screen, grid, pos, selected)  # Animate swap back
+                                swap(grid, selected, pos)  # Swap back
                         selected = None
         draw_grid(screen, grid)
         draw_score(screen, score)  # Draw the score on the screen
